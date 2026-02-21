@@ -153,7 +153,7 @@ class DocumentProcessor:
             with open(file_path, "rb") as f:
                 chunk = f.read(1024)
                 return b"\x00" in chunk
-        except Exception:
+        except OSError:
             return True
 
     def process_file(

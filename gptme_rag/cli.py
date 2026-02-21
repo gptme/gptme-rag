@@ -1,3 +1,4 @@
+import contextlib
 import json
 import logging
 import os
@@ -402,10 +403,8 @@ def search(
                 console.print(f"❌ Error parsing weights: {e}", style="red")
                 return
 
-        # Temporarily redirect stdout to suppress ChromaDB output
-        stdout = sys.stdout
-        sys.stdout = open(os.devnull, "w")
-        try:
+        # Redirect stdout to suppress ChromaDB output (using context manager for safety)
+        with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
             # Initialize indexer with explicit arguments
             # Always use ModernBERT by default for better results
             indexer = Indexer(
@@ -440,9 +439,6 @@ def search(
                 documents, distances, _ = indexer.search(
                     query, n_results=n_results, paths=search_paths, path_filters=filter
                 )
-        finally:
-            sys.stdout.close()
-            sys.stdout = stdout
 
     if not documents:
         console.print("No results found", style="yellow")

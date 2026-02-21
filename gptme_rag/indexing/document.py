@@ -64,11 +64,6 @@ class Document:
             # Process file in chunks
             base_id = str(path.absolute())
             for chunk in processor.process_file(path):
-                # Merge base metadata with chunk metadata
-                chunk_metadata = {
-                    **base_metadata,
-                    **chunk["metadata"],
-                }
                 # Ensure unique chunk IDs by using both index and position
                 chunk_id = f"{base_id}#chunk{chunk['metadata']['chunk_index']}-{chunk['metadata']['chunk_start']}"
                 # Create chunk metadata with chunk-specific fields

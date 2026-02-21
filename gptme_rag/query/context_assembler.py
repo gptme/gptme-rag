@@ -64,12 +64,13 @@ class ContextAssembler:
             total_tokens += query_tokens
 
         # Add documents until we hit token limit
+        seen_contents: set[str] = set()
         for doc in documents:
             formatted_doc = self._format_document(doc)
             doc_tokens = self._count_tokens(formatted_doc)
 
-            # check if document content is duplicate
-            if doc.content in [d.content for d in included_docs]:
+            # check if document content is duplicate (O(1) lookup instead of O(n))
+            if doc.content in seen_contents:
                 logger.warning(f"Duplicate document found: {doc.metadata['source']}")
                 continue
 
@@ -80,6 +81,7 @@ class ContextAssembler:
             total_tokens += doc_tokens
             context_parts.append(formatted_doc)
             included_docs.append(doc)
+            seen_contents.add(doc.content)
 
         # Add user query at the end if provided
         if user_query:
