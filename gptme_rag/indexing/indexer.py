@@ -738,7 +738,12 @@ class Indexer:
             sorted_docs = sorted(docs_by_source.values(), key=lambda x: x[1])[
                 :n_results
             ]
-            documents, distances = zip(*sorted_docs) if sorted_docs else ([], [])
+            if sorted_docs:
+                docs_tuple, dist_tuple = zip(*sorted_docs)
+                documents: list[Document] = list(docs_tuple)
+                distances: list[float] = list(dist_tuple)
+            else:
+                documents, distances = [], []
         else:
             # Process individual chunks
             documents, distances, _ = self._process_individual_chunks(
@@ -761,13 +766,13 @@ class Indexer:
         cache_entry = CacheEntry(
             document_contents=[doc.content for doc in documents],
             document_metadatas=[doc.metadata for doc in documents],
-            document_ids=[doc.doc_id for doc in documents],
+            document_ids=[doc.doc_id or "" for doc in documents],
             distances=list(distances),
             created_at=datetime.now(),
             last_accessed=datetime.now(),
             access_count=0,
             workspace_mtime=0.0,  # TODO: Track workspace modification time
-            index_mtime=0.0,      # TODO: Track index modification time
+            index_mtime=0.0,  # TODO: Track index modification time
             embedding_time_ms=0.0,  # TODO: Track embedding time
             result_count=len(documents),
         )
