@@ -52,8 +52,7 @@ class IndexEventHandler(FileSystemEventHandler):
     def on_deleted(self, event: FileSystemEvent) -> None:
         """Handle file deletion events."""
         if not event.is_directory and self._should_process(event.src_path):
-            # TODO: Implement document removal in Indexer
-            logger.info(f"File deleted: {event.src_path}")
+            self._queue_deletion(Path(event.src_path))
 
     def _should_process(self, path: str) -> bool:
         """Check if a file should be processed based on pattern and ignore patterns."""
@@ -64,56 +63,92 @@ class IndexEventHandler(FileSystemEventHandler):
 
     def _queue_update(self, path: Path) -> None:
         """Queue a file for update with debouncing.
-        
+
         Multiple rapid events for the same file are coalesced into a single update.
         """
         resolved_path = path.resolve()
-        
+
         with self._lock:
             if self._should_skip_file(path, set()):
                 return
-            
+
             # Cancel any existing timer for this path
             if resolved_path in self._timers:
                 self._timers[resolved_path].cancel()
-            
+
             # Schedule update after delay (debouncing)
-            timer = Timer(self._update_delay, self._process_update, args=[resolved_path])
+            timer = Timer(
+                self._update_delay, self._process_update, args=[resolved_path]
+            )
             self._timers[resolved_path] = timer
             timer.start()
             logger.debug(f"Queued update for {path} (delay: {self._update_delay}s)")
+
+    def _queue_deletion(self, path: Path) -> None:
+        """Queue a file for deletion from the index with debouncing."""
+        resolved_path = path.resolve()
+
+        with self._lock:
+            # Cancel any pending update timer for this path
+            if resolved_path in self._timers:
+                self._timers[resolved_path].cancel()
+
+            # Schedule deletion after delay (debouncing)
+            timer = Timer(
+                self._update_delay, self._process_deletion, args=[resolved_path]
+            )
+            self._timers[resolved_path] = timer
+            timer.start()
+            logger.debug(f"Queued deletion for {path} (delay: {self._update_delay}s)")
+
+    def _process_deletion(self, path: Path) -> None:
+        """Process a queued file deletion."""
+        with self._lock:
+            self._timers.pop(path, None)
+
+        canonical_path = str(path)
+        logger.info(f"Removing deleted file from index: {canonical_path}")
+
+        try:
+            self.indexer.delete_documents({"source": canonical_path})
+            self.indexer.cache.clear()
+            logger.debug(f"Successfully removed {canonical_path} from index")
+        except Exception as e:
+            logger.error(
+                f"Error removing {canonical_path} from index: {e}", exc_info=True
+            )
 
     def _process_update(self, path: Path) -> None:
         """Process a queued file update."""
         with self._lock:
             # Remove timer reference
             self._timers.pop(path, None)
-        
+
         logger.debug(f"Processing update for {path}")
-        
+
         try:
             if not path.exists():
                 logger.debug(f"File no longer exists, skipping: {path}")
                 return
-            
+
             # Read file content to ensure it's readable
             content = path.read_text()
             canonical_path = str(path)
-            
+
             # Delete old versions
             logger.debug(f"Deleting old versions for {canonical_path}")
             self.indexer.delete_documents({"source": canonical_path})
-            
+
             # Index new content
             logger.debug(f"Indexing new content for {canonical_path}")
             n_indexed = self.indexer.index_file(path)
             if n_indexed == 0:
                 logger.warning(f"No documents indexed for {path}")
                 return
-            
+
             # Clear search cache to ensure fresh results
             self.indexer.cache.clear()
-            
+
             # Verify the update
             logger.debug(f"Verifying update for {canonical_path}")
             results, _, _ = self.indexer.search(content[:100], n_results=1)
@@ -123,7 +158,7 @@ class IndexEventHandler(FileSystemEventHandler):
                 logger.warning(f"Found results but source doesn't match for {path}")
             else:
                 logger.debug(f"Successfully updated {path}")
-                
+
         except FileNotFoundError:
             logger.debug(f"File no longer exists (likely moved/deleted): {path}")
         except Exception as e:
@@ -370,7 +405,7 @@ class IndexEventHandler(FileSystemEventHandler):
         self._pending_updates.clear()
         self._last_update = time.time()
         logger.info("Finished processing updates")
-    
+
     def cancel_pending_updates(self) -> None:
         """Cancel all pending update timers."""
         with self._lock:
