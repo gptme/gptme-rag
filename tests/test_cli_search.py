@@ -129,7 +129,7 @@ def test_search_json_output_context_info(populated_index):
 
 
 def test_search_json_no_results(tmp_path):
-    """JSON output for an empty index returns empty results list."""
+    """JSON output for an empty index returns empty results list with context key."""
     # Create the index directory (CLI requires it to exist)
     Indexer(
         persist_directory=tmp_path / "empty",
@@ -151,6 +151,41 @@ def test_search_json_no_results(tmp_path):
     data = json.loads(result.output)
     assert data["results"] == []
     assert data["total_results"] == 0
+    # context key must be present even when there are no results (schema consistency)
+    assert "context" in data
+    assert data["context"]["total_tokens"] == 0
+    assert data["context"]["truncated"] is False
+
+
+def test_search_json_format_flag_warns(populated_index, capsys):
+    """--format is silently ignored when --json is set, with a stderr warning."""
+    import subprocess
+    import sys
+
+    # Use subprocess so we can capture real stderr separately from stdout
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "gptme_rag.cli",
+            "search",
+            "Python",
+            "--persist-dir",
+            str(populated_index),
+            "--json",
+            "--format",
+            "full",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    # stdout should be valid JSON
+    data = json.loads(result.stdout)
+    assert "results" in data
+    # Warning should appear on stderr
+    assert "Warning" in result.stderr
+    assert "--format" in result.stderr
 
 
 def test_search_json_output_is_valid_json(populated_index):

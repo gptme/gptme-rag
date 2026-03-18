@@ -451,7 +451,16 @@ def search(
 
     if not documents:
         if output_json:
-            print(json.dumps({"query": query, "results": [], "total_results": 0}))
+            print(
+                json.dumps(
+                    {
+                        "query": query,
+                        "results": [],
+                        "total_results": 0,
+                        "context": {"total_tokens": 0, "truncated": False},
+                    }
+                )
+            )
         else:
             console.print("No results found", style="yellow")
         return
@@ -507,9 +516,16 @@ def search(
 
     # JSON output mode — emit machine-readable result and exit early
     if output_json:
+        if format != "summary":
+            print(
+                "Warning: --format is ignored when --json is used (JSON output includes all content)",
+                file=sys.stderr,
+            )
         results = []
         for i, doc in enumerate(documents):
-            relevance = float(1 - distances[i]) if distances else None
+            relevance = (
+                max(0.0, min(1.0, float(1 - distances[i]))) if distances else None
+            )
             content = get_expanded_content(doc, expand, indexer)
             result: dict = {
                 "source": doc.metadata.get("source", "unknown"),
