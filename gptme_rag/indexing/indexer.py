@@ -740,8 +740,8 @@ class Indexer:
             ]
             if sorted_docs:
                 docs_tuple, dist_tuple = zip(*sorted_docs)
-                documents: list[Document] = list(docs_tuple)
-                distances: list[float] = list(dist_tuple)
+                documents = list(docs_tuple)
+                distances = list(dist_tuple)
             else:
                 documents, distances = [], []
         else:

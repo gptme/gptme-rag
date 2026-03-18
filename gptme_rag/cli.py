@@ -370,6 +370,12 @@ def index(
     multiple=True,
     help="Filter results by path pattern (glob). Can be specified multiple times.",
 )
+@click.option(
+    "--output-format",
+    type=click.Choice(["human", "json"]),
+    default="human",
+    help="Output format: human (default, rich-formatted) or json (machine-readable)",
+)
 def search(
     query: str,
     paths: list[Path],
@@ -385,6 +391,7 @@ def search(
     embedding_function: str | None,
     device: str | None,
     filter: tuple[str, ...],
+    output_format: str,
 ):
     """Search the index and assemble context."""
     paths = [path.resolve() for path in paths]
@@ -427,6 +434,7 @@ def search(
                     search_paths = [Path(".")]
                 logger.debug(f"Using path filters: {filter}")
 
+            explanations: list | None = None
             if explain:
                 documents, distances, explanations = indexer.search(
                     query,
@@ -441,7 +449,10 @@ def search(
                 )
 
     if not documents:
-        console.print("No results found", style="yellow")
+        if output_format == "json":
+            print(json.dumps({"query": query, "results": [], "total_results": 0}))
+        else:
+            console.print("No results found", style="yellow")
         return
 
     # Debug info in verbose mode
@@ -492,6 +503,37 @@ def search(
             logger.debug(f"Found {len(chunks)} adjacent chunks")
 
         return ChunkMerger.merge_chunks(chunks)
+
+    # JSON output mode — emit machine-readable result and exit early
+    if output_format == "json":
+        results = []
+        for i, doc in enumerate(documents):
+            relevance = float(1 - distances[i]) if distances else None
+            content = get_expanded_content(doc, expand, indexer)
+            result: dict = {
+                "source": doc.metadata.get("source", "unknown"),
+                "relevance": relevance,
+                "content": content,
+                "metadata": {
+                    k: v
+                    for k, v in doc.metadata.items()
+                    if k not in ("source",)  # already top-level
+                },
+            }
+            if explain and explanations:
+                result["explanation"] = explanations[i]
+            results.append(result)
+        output = {
+            "query": query,
+            "total_results": len(results),
+            "results": results,
+            "context": {
+                "total_tokens": context.total_tokens,
+                "truncated": context.truncated,
+            },
+        }
+        print(json.dumps(output, indent=2, default=str))
+        return
 
     # Initialize output formatter
     formatter = SearchOutputFormatter(console, raw)
