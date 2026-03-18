@@ -157,7 +157,7 @@ def test_search_json_no_results(tmp_path):
     assert data["context"]["truncated"] is False
 
 
-def test_search_json_format_flag_warns(populated_index, capsys):
+def test_search_json_format_flag_warns(populated_index):
     """--format is silently ignored when --json is set, with a stderr warning."""
     import subprocess
     import sys

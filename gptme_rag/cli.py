@@ -458,7 +458,8 @@ def search(
                         "results": [],
                         "total_results": 0,
                         "context": {"total_tokens": 0, "truncated": False},
-                    }
+                    },
+                    indent=2,
                 )
             )
         else:
@@ -540,12 +541,18 @@ def search(
             if explain and explanations:
                 result["explanation"] = explanations[i]
             results.append(result)
+        # When --expand is used, context.total_tokens reflects pre-expansion chunk size.
+        # Recompute from the actual returned content for accuracy.
+        if expand != "none":
+            total_tokens = sum(assembler._count_tokens(r["content"]) for r in results)
+        else:
+            total_tokens = context.total_tokens
         output = {
             "query": query,
             "total_results": len(results),
             "results": results,
             "context": {
-                "total_tokens": context.total_tokens,
+                "total_tokens": total_tokens,
                 "truncated": context.truncated,
             },
         }
