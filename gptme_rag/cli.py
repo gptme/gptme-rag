@@ -371,10 +371,11 @@ def index(
     help="Filter results by path pattern (glob). Can be specified multiple times.",
 )
 @click.option(
-    "--output-format",
-    type=click.Choice(["human", "json"]),
-    default="human",
-    help="Output format: human (default, rich-formatted) or json (machine-readable)",
+    "--json",
+    "output_json",
+    is_flag=True,
+    default=False,
+    help="Output results as JSON (machine-readable).",
 )
 def search(
     query: str,
@@ -391,7 +392,7 @@ def search(
     embedding_function: str | None,
     device: str | None,
     filter: tuple[str, ...],
-    output_format: str,
+    output_json: bool,
 ):
     """Search the index and assemble context."""
     paths = [path.resolve() for path in paths]
@@ -449,7 +450,7 @@ def search(
                 )
 
     if not documents:
-        if output_format == "json":
+        if output_json:
             print(json.dumps({"query": query, "results": [], "total_results": 0}))
         else:
             console.print("No results found", style="yellow")
@@ -505,7 +506,7 @@ def search(
         return ChunkMerger.merge_chunks(chunks)
 
     # JSON output mode — emit machine-readable result and exit early
-    if output_format == "json":
+    if output_json:
         results = []
         for i, doc in enumerate(documents):
             relevance = float(1 - distances[i]) if distances else None

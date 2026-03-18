@@ -1,4 +1,4 @@
-"""Tests for the CLI search command, focusing on --output-format json."""
+"""Tests for the CLI search command, focusing on --json flag."""
 
 import json
 
@@ -45,8 +45,7 @@ def test_search_json_output_structure(populated_index):
             "Python programming",
             "--persist-dir",
             str(populated_index),
-            "--output-format",
-            "json",
+            "--json",
         ],
         catch_exceptions=False,
     )
@@ -68,8 +67,7 @@ def test_search_json_output_query_echoed(populated_index):
             "Python programming",
             "--persist-dir",
             str(populated_index),
-            "--output-format",
-            "json",
+            "--json",
         ],
         catch_exceptions=False,
     )
@@ -90,8 +88,7 @@ def test_search_json_output_result_fields(populated_index):
             str(populated_index),
             "--n-results",
             "1",
-            "--output-format",
-            "json",
+            "--json",
         ],
         catch_exceptions=False,
     )
@@ -118,8 +115,7 @@ def test_search_json_output_context_info(populated_index):
             "machine learning",
             "--persist-dir",
             str(populated_index),
-            "--output-format",
-            "json",
+            "--json",
         ],
         catch_exceptions=False,
     )
@@ -147,8 +143,7 @@ def test_search_json_no_results(tmp_path):
             "anything",
             "--persist-dir",
             str(tmp_path / "empty"),
-            "--output-format",
-            "json",
+            "--json",
         ],
         catch_exceptions=False,
     )
@@ -168,8 +163,7 @@ def test_search_json_output_is_valid_json(populated_index):
             "data",
             "--persist-dir",
             str(populated_index),
-            "--output-format",
-            "json",
+            "--json",
         ],
         catch_exceptions=False,
     )
@@ -180,7 +174,7 @@ def test_search_json_output_is_valid_json(populated_index):
 
 
 def test_search_human_format_is_default(populated_index):
-    """Default output format is human-readable (not JSON)."""
+    """Default output is human-readable (not JSON)."""
     runner = CliRunner()
     result = runner.invoke(
         cli,
