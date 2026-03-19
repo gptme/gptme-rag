@@ -106,7 +106,7 @@ def test_search_json_output_result_fields(populated_index):
 
 
 def test_search_json_output_context_info(populated_index):
-    """Context info block includes total_tokens and truncated."""
+    """Context info block includes total_tokens, included_results, and truncated."""
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -128,7 +128,10 @@ def test_search_json_output_context_info(populated_index):
     assert isinstance(ctx["total_tokens"], int)
     assert isinstance(ctx["truncated"], bool)
     assert isinstance(ctx["results_in_context"], int)
+    # results_in_context <= total_results (equals when not truncated)
     assert ctx["results_in_context"] <= data["total_results"]
+    if not ctx["truncated"]:
+        assert ctx["results_in_context"] == data["total_results"]
 
 
 def test_search_json_no_results(tmp_path):

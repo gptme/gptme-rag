@@ -545,16 +545,14 @@ def search(
             if explain and explanations:
                 result["explanation"] = explanations[i]
             results.append(result)
-        # When --expand is used, context.total_tokens reflects pre-expansion chunk size.
-        # Recompute from the actual returned content for accuracy.
-        if expand != "none":
-            total_tokens = sum(assembler.count_tokens(r["content"]) for r in results)
-        else:
-            total_tokens = context.total_tokens
+        # Always compute total_tokens from raw content for consistent semantics.
+        # context.total_tokens adds XML formatting overhead and query tokens that
+        # are not part of the returned content — use raw content counts instead.
+        total_tokens = sum(assembler.count_tokens(r["content"]) for r in results)
         # results_in_context: how many of the returned results fit in the assembled
-        # context window.  When truncated, this is less than total_results, which
-        # makes context.truncated unambiguous for machine consumers.
-        results_in_context = len(context.documents)
+        # context window. When expand=="none" and truncated, this is less than
+        # total_results; when expanding, all results are returned.
+        results_in_context = len(context.documents) if expand == "none" else len(results)
         output = {
             "query": query,
             "total_results": len(results),

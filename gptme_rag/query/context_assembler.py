@@ -55,7 +55,7 @@ class ContextAssembler:
 
         # Add system prompt if provided
         if system_prompt:
-            system_tokens = self._count_tokens(system_prompt)
+            system_tokens = self.count_tokens(system_prompt)
             if system_tokens < self.max_tokens:
                 total_tokens += system_tokens
                 context_parts.append(system_prompt)
@@ -63,14 +63,14 @@ class ContextAssembler:
         # Reserve tokens for user query if provided
         query_tokens = 0
         if user_query:
-            query_tokens = self._count_tokens(user_query)
+            query_tokens = self.count_tokens(user_query)
             total_tokens += query_tokens
 
         # Add documents until we hit token limit
         seen_contents: set[str] = set()
         for doc in documents:
             formatted_doc = self._format_document(doc)
-            doc_tokens = self._count_tokens(formatted_doc)
+            doc_tokens = self.count_tokens(formatted_doc)
 
             # check if document content is duplicate (O(1) lookup instead of O(n))
             if doc.content in seen_contents:
