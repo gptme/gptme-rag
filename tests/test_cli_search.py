@@ -124,8 +124,11 @@ def test_search_json_output_context_info(populated_index):
     ctx = data["context"]
     assert "total_tokens" in ctx
     assert "truncated" in ctx
+    assert "results_in_context" in ctx
     assert isinstance(ctx["total_tokens"], int)
     assert isinstance(ctx["truncated"], bool)
+    assert isinstance(ctx["results_in_context"], int)
+    assert ctx["results_in_context"] <= data["total_results"]
 
 
 def test_search_json_no_results(tmp_path):
@@ -155,6 +158,7 @@ def test_search_json_no_results(tmp_path):
     assert "context" in data
     assert data["context"]["total_tokens"] == 0
     assert data["context"]["truncated"] is False
+    assert data["context"]["results_in_context"] == 0
 
 
 def test_search_json_format_flag_warns(populated_index):

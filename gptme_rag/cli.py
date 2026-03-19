@@ -457,7 +457,11 @@ def search(
                         "query": query,
                         "results": [],
                         "total_results": 0,
-                        "context": {"total_tokens": 0, "truncated": False},
+                        "context": {
+                            "total_tokens": 0,
+                            "truncated": False,
+                            "results_in_context": 0,
+                        },
                     },
                     indent=2,
                 )
@@ -544,9 +548,13 @@ def search(
         # When --expand is used, context.total_tokens reflects pre-expansion chunk size.
         # Recompute from the actual returned content for accuracy.
         if expand != "none":
-            total_tokens = sum(assembler._count_tokens(r["content"]) for r in results)
+            total_tokens = sum(assembler.count_tokens(r["content"]) for r in results)
         else:
             total_tokens = context.total_tokens
+        # results_in_context: how many of the returned results fit in the assembled
+        # context window.  When truncated, this is less than total_results, which
+        # makes context.truncated unambiguous for machine consumers.
+        results_in_context = len(context.documents)
         output = {
             "query": query,
             "total_results": len(results),
@@ -554,6 +562,7 @@ def search(
             "context": {
                 "total_tokens": total_tokens,
                 "truncated": context.truncated,
+                "results_in_context": results_in_context,
             },
         }
         print(json.dumps(output, indent=2, default=str))

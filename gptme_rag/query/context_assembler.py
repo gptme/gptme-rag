@@ -25,9 +25,12 @@ class ContextAssembler:
         self.max_tokens = max_tokens
         self.tokenizer = tiktoken.encoding_for_model(model)
 
-    def _count_tokens(self, text: str) -> int:
+    def count_tokens(self, text: str) -> int:
         """Count the number of tokens in a text."""
         return len(self.tokenizer.encode(text))
+
+    # Keep private alias for internal use
+    _count_tokens = count_tokens
 
     def _format_document(self, doc: Document) -> str:
         """Format a document for inclusion in the context window."""
