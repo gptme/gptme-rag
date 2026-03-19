@@ -1,6 +1,8 @@
 """Tests for the CLI search command, focusing on --json flag."""
 
 import json
+import subprocess
+import sys
 
 import pytest
 from click.testing import CliRunner
@@ -166,9 +168,6 @@ def test_search_json_no_results(tmp_path):
 
 def test_search_json_format_flag_warns(populated_index):
     """--format is silently ignored when --json is set, with a stderr warning."""
-    import subprocess
-    import sys
-
     # Use subprocess so we can capture real stderr separately from stdout
     result = subprocess.run(
         [
@@ -213,6 +212,35 @@ def test_search_json_output_is_valid_json(populated_index):
     # Should parse without error
     data = json.loads(result.output)
     assert isinstance(data, dict)
+
+
+def test_search_json_expand_truncated_consistency(populated_index):
+    """When --expand is used, truncated is always False (all results are returned)."""
+    runner = CliRunner()
+    for expand_mode in ("adjacent", "file"):
+        result = runner.invoke(
+            cli,
+            [
+                "search",
+                "Python",
+                "--persist-dir",
+                str(populated_index),
+                "--json",
+                "--expand",
+                expand_mode,
+            ],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        ctx = data["context"]
+        # truncated must be False when expand is active — all results are returned
+        assert ctx["truncated"] is False, (
+            f"--expand {expand_mode}: truncated={ctx['truncated']} but "
+            f"results_in_context={ctx['results_in_context']} == total_results={data['total_results']}"
+        )
+        # results_in_context must equal total_results in expand mode
+        assert ctx["results_in_context"] == data["total_results"]
 
 
 def test_search_human_format_is_default(populated_index):

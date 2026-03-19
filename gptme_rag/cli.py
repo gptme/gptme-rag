@@ -552,14 +552,20 @@ def search(
         # results_in_context: how many of the returned results fit in the assembled
         # context window. When expand=="none" and truncated, this is less than
         # total_results; when expanding, all results are returned.
-        results_in_context = len(context.documents) if expand == "none" else len(results)
+        results_in_context = (
+            len(context.documents) if expand == "none" else len(results)
+        )
+        # truncated: only meaningful for expand=="none" — the assembler truncates
+        # unexpanded chunks. When expand is active, all results are returned in
+        # full, so truncated is always False (no result is omitted).
+        truncated = context.truncated if expand == "none" else False
         output = {
             "query": query,
             "total_results": len(results),
             "results": results,
             "context": {
                 "total_tokens": total_tokens,
-                "truncated": context.truncated,
+                "truncated": truncated,
                 "results_in_context": results_in_context,
             },
         }
