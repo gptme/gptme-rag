@@ -555,10 +555,16 @@ def search(
         results_in_context = (
             len(context.documents) if expand == "none" else len(results)
         )
-        # truncated: only meaningful for expand=="none" — the assembler truncates
-        # unexpanded chunks. When expand is active, all results are returned in
-        # full, so truncated is always False (no result is omitted).
-        truncated = context.truncated if expand == "none" else False
+        # truncated: indicates some results were excluded from the context.
+        # Covers both token-limit truncation (context.truncated) and content
+        # deduplication by assemble_context (which silently drops duplicates
+        # without setting context.truncated). When expand is active, all results
+        # are returned in full, so truncated is always False.
+        truncated = (
+            (context.truncated or len(context.documents) < len(results))
+            if expand == "none"
+            else False
+        )
         output = {
             "query": query,
             "total_results": len(results),

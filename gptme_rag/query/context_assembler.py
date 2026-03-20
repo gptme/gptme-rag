@@ -29,9 +29,6 @@ class ContextAssembler:
         """Count the number of tokens in a text."""
         return len(self.tokenizer.encode(text))
 
-    # Keep private alias for internal use
-    _count_tokens = count_tokens
-
     def _format_document(self, doc: Document) -> str:
         """Format a document for inclusion in the context window."""
         return doc.format_xml()

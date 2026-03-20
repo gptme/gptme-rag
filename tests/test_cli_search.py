@@ -243,6 +243,61 @@ def test_search_json_expand_truncated_consistency(populated_index):
         assert ctx["results_in_context"] == data["total_results"]
 
 
+def test_search_json_truncated_on_dedup(tmp_path):
+    """When assemble_context deduplicates chunks, truncated reflects the drop."""
+    index_dir = tmp_path / "dedup_index"
+    indexer = Indexer(
+        persist_directory=index_dir,
+        enable_persist=True,
+        # Large chunk size to avoid splitting — each doc becomes one chunk
+        chunk_size=500,
+        chunk_overlap=0,
+    )
+    # Two documents with identical content but different sources
+    shared_content = "Duplicate content about Python programming and data analysis."
+    docs = [
+        Document(
+            content=shared_content,
+            metadata={"source": str(tmp_path / "file_a.txt"), "extension": ".txt"},
+            doc_id="dup_a",
+        ),
+        Document(
+            content=shared_content,
+            metadata={"source": str(tmp_path / "file_b.txt"), "extension": ".txt"},
+            doc_id="dup_b",
+        ),
+    ]
+    indexer.add_documents(docs)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "search",
+            "Python programming",
+            "--persist-dir",
+            str(index_dir),
+            "--n-results",
+            "10",
+            "--json",
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    ctx = data["context"]
+    # ChromaDB may return both duplicates as results
+    if data["total_results"] > 1 and ctx["results_in_context"] < data["total_results"]:
+        # The dedup dropped results — truncated must be True
+        assert ctx["truncated"] is True, (
+            f"results_in_context={ctx['results_in_context']} < "
+            f"total_results={data['total_results']} but truncated=False"
+        )
+    # The invariant from test_search_json_output_context_info still holds:
+    # if not truncated, results_in_context == total_results
+    if not ctx["truncated"]:
+        assert ctx["results_in_context"] == data["total_results"]
+
+
 def test_search_human_format_is_default(populated_index):
     """Default output is human-readable (not JSON)."""
     runner = CliRunner()
