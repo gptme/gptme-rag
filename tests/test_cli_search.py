@@ -285,17 +285,21 @@ def test_search_json_truncated_on_dedup(tmp_path):
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     ctx = data["context"]
-    # ChromaDB may return both duplicates as results
-    if data["total_results"] > 1 and ctx["results_in_context"] < data["total_results"]:
-        # The dedup dropped results — truncated must be True
-        assert ctx["truncated"] is True, (
-            f"results_in_context={ctx['results_in_context']} < "
-            f"total_results={data['total_results']} but truncated=False"
-        )
-    # The invariant from test_search_json_output_context_info still holds:
-    # if not truncated, results_in_context == total_results
-    if not ctx["truncated"]:
-        assert ctx["results_in_context"] == data["total_results"]
+    # Both docs have distinct IDs (dup_a, dup_b) so ChromaDB stores and returns
+    # both — the indexer deduplicates by ID only, not by content.
+    assert data["total_results"] == 2, (
+        f"Expected both duplicate docs to be returned by ChromaDB, "
+        f"got total_results={data['total_results']}"
+    )
+    # assemble_context sees identical content and drops the second doc
+    assert (
+        ctx["results_in_context"] == 1
+    ), f"Expected dedup to keep only 1 doc, got results_in_context={ctx['results_in_context']}"
+    # The fix: truncated must be True when dedup dropped results
+    assert ctx["truncated"] is True, (
+        f"results_in_context={ctx['results_in_context']} < "
+        f"total_results={data['total_results']} but truncated=False"
+    )
 
 
 def test_search_human_format_is_default(populated_index):
