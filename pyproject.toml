@@ -32,6 +32,10 @@ watchdog = "^3.0.0"
 psutil = "^6.1.0"
 tqdm = "^4.67.1"
 sentence-transformers = "^3.3.1"
+mcp = { version = ">=1.0", optional = true }
+
+[tool.poetry.extras]
+mcp = ["mcp"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"

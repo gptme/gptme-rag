@@ -121,6 +121,32 @@ The watcher will:
 - Handle rapid changes efficiently with debouncing
 - Continue running until interrupted (Ctrl+C)
 
+### MCP Server (Model Context Protocol)
+
+Expose `gptme-rag` to MCP-capable agents (Claude Code, Cursor, Codex, gptme):
+
+```bash
+# Install with the optional MCP extra
+pip install gptme-rag[mcp]
+
+# Run as an MCP stdio server against an existing index
+gptme-rag mcp --persist-dir ./my-index
+```
+
+Available tools:
+
+- `rag_query(query, top_k=5, persist_dir=None)` — search the index
+- `rag_index_status(persist_dir=None)` — return index size and embedding model
+- `rag_index_refresh(directory, pattern="**/*", persist_dir=None)` — re-index a directory
+
+Add to Claude Code via:
+
+```bash
+claude mcp add gptme-rag -- gptme-rag mcp --persist-dir /absolute/path/to/index
+```
+
+See [issue #22](https://github.com/gptme/gptme-rag/issues/22) for the v1 scope and roadmap.
+
 ### Performance Benchmarking
 
 The benchmark commands help measure and optimize performance:

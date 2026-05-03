@@ -841,6 +841,26 @@ def status():
             console.print_exception()
 
 
+@cli.command()
+@click.option(
+    "--persist-dir",
+    type=click.Path(path_type=Path),
+    default=default_persist_dir,
+    help="Directory of the index to expose over MCP",
+)
+def mcp(persist_dir: Path):
+    """Run gptme-rag as an MCP (Model Context Protocol) stdio server.
+
+    Exposes ``rag_query``, ``rag_index_status``, and ``rag_index_refresh``
+    tools to any MCP-capable client (Claude Code, Cursor, Codex, gptme).
+
+    Requires the ``mcp`` extra: ``pip install gptme-rag[mcp]``.
+    """
+    from gptme_rag.mcp_server import run as run_mcp
+
+    run_mcp(persist_dir=persist_dir)
+
+
 @cli.group()
 def benchmark():
     """Run performance benchmarks."""
