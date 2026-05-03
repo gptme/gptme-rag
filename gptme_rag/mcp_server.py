@@ -64,7 +64,9 @@ def build_server(persist_dir: Path | None = None) -> Any:
         target = target.expanduser().resolve()
         target.mkdir(parents=True, exist_ok=True)
         if target not in _indexer_cache:
-            _indexer_cache[target] = Indexer(persist_directory=target)
+            _indexer_cache[target] = Indexer(
+                persist_directory=target, enable_persist=True
+            )
         return _indexer_cache[target]
 
     @server.tool()
