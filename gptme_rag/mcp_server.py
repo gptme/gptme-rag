@@ -120,7 +120,8 @@ def build_server(persist_dir: Path | None = None) -> Any:
             persist_dir: Optional override for the index directory.
 
         Returns:
-            Dict with ``directory``, ``pattern``, ``documents_indexed``.
+            Dict with ``directory``, ``pattern``, ``documents_before``,
+            ``documents_after``, ``documents_indexed_delta``.
         """
         directory_path = Path(directory).resolve()
         if not directory_path.is_dir():
