@@ -55,13 +55,17 @@ def build_server(persist_dir: Path | None = None) -> Any:
     from gptme_rag.indexing.indexer import Indexer
 
     server = FastMCP("gptme-rag")
+    _indexer_cache: dict[Path, Indexer] = {}
 
     def _get_indexer(override_persist_dir: str | None = None) -> Indexer:
         target = Path(override_persist_dir) if override_persist_dir else persist_dir
         if target is None:
             target = Path.home() / ".cache" / "gptme-rag" / "default"
+        target = target.expanduser().resolve()
         target.mkdir(parents=True, exist_ok=True)
-        return Indexer(persist_directory=target)
+        if target not in _indexer_cache:
+            _indexer_cache[target] = Indexer(persist_directory=target)
+        return _indexer_cache[target]
 
     @server.tool()
     def rag_query(
@@ -96,13 +100,8 @@ def build_server(persist_dir: Path | None = None) -> Any:
         """
         indexer = _get_indexer(persist_dir)
         count = indexer.collection.count() if indexer.collection else 0
-        target = (
-            Path(persist_dir)
-            if persist_dir
-            else (persist_dir or indexer.persist_directory)
-        )
         return {
-            "persist_dir": str(target),
+            "persist_dir": str(indexer.persist_directory),
             "document_count": int(count),
             "embedding_model": indexer.embedding_model_name,
         }
@@ -149,4 +148,4 @@ def run(persist_dir: Path | None = None) -> None:
     Used as the entry point for ``gptme-rag mcp``.
     """
     server = build_server(persist_dir=persist_dir)
-    server.run()
+    server.run(transport="stdio")
