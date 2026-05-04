@@ -29,7 +29,8 @@ def _format_results(
             content = content[:max_chars_per_doc] + "...[truncated]"
         out.append(
             {
-                "score": float(score),
+                "score": 1.0
+                - float(score),  # convert distance → similarity (higher = better)
                 "source": str(doc.metadata.get("source", "")) if doc.metadata else "",
                 "content": content,
                 "metadata": dict(doc.metadata) if doc.metadata else {},
