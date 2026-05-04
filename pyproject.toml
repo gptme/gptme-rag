@@ -57,6 +57,11 @@ ignore = ["E402", "E501", "B905"]
 ignore_missing_imports = true
 check_untyped_defs = true
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: tests that load the embedding model and build a real index (~30s)",
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
