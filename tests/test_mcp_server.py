@@ -1,17 +1,18 @@
 """Tests for the MCP server wrapper.
 
-Skips when the optional ``mcp`` extra is not installed (CI without [mcp]).
+Most tests only require gptme-rag itself; the mcp package is only needed
+for ``test_build_server_returns_fastmcp_instance`` which is skipped when
+the optional ``mcp`` extra is not installed.
 """
 
 from __future__ import annotations
 
 import pytest
 
-mcp = pytest.importorskip("mcp", reason="mcp extra not installed")
-
 
 def test_build_server_returns_fastmcp_instance(tmp_path):
     """build_server should return a FastMCP server bound to gptme-rag tools."""
+    pytest.importorskip("mcp", reason="mcp extra not installed")
     from gptme_rag.mcp_server import build_server
 
     server = build_server(persist_dir=tmp_path / "index")

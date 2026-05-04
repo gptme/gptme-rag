@@ -137,7 +137,7 @@ Available tools:
 
 - `rag_query(query, top_k=5, persist_dir=None)` — search the index
 - `rag_index_status(persist_dir=None)` — return index size and embedding model
-- `rag_index_refresh(directory, pattern="**/*", persist_dir=None)` — re-index a directory
+- `rag_index_refresh(directory, pattern="**/*.*", persist_dir=None)` — re-index a directory
 
 Add to Claude Code via:
 
