@@ -112,14 +112,14 @@ def build_server(persist_dir: Path | None = None) -> Any:
     @server.tool()
     def rag_index_refresh(
         directory: str,
-        pattern: str = "**/*",
+        pattern: str = "**/*.*",
         persist_dir: str | None = None,
     ) -> dict[str, Any]:
         """Re-index ``directory`` into the gptme-rag store.
 
         Args:
             directory: Directory to walk for documents.
-            pattern: Glob pattern (default ``**/*``).
+            pattern: Glob pattern (default ``**/*.*``, matches files with extensions).
             persist_dir: Optional override for the index directory.
 
         Returns:
