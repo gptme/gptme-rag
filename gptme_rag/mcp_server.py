@@ -136,6 +136,7 @@ def build_server(persist_dir: Path | None = None) -> Any:
         indexer = _get_indexer(persist_dir)
         before = indexer.get_status()["document_count"]  # unique source files
         indexer.index_directory(directory_path, glob_pattern=pattern)
+        indexer.cache.clear()  # flush stale cached queries so next rag_query sees fresh index
         after = indexer.get_status()["document_count"]  # unique source files
 
         return {
