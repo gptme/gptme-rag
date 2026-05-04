@@ -99,13 +99,15 @@ def build_server(persist_dir: Path | None = None) -> Any:
             persist_dir: Optional override for the index directory.
 
         Returns:
-            Dict with ``persist_dir``, ``document_count``, ``embedding_model``.
+            Dict with ``persist_dir``, ``document_count`` (unique source files),
+            ``chunk_count`` (total ChromaDB chunks), ``embedding_model``.
         """
         indexer = _get_indexer(persist_dir)
-        count = indexer.collection.count() if indexer.collection else 0
+        status = indexer.get_status()
         return {
             "persist_dir": str(indexer.persist_directory),
-            "document_count": int(count),
+            "document_count": status["document_count"],  # unique source files
+            "chunk_count": status["chunk_count"],  # raw ChromaDB chunks
             "embedding_model": indexer.embedding_model_name,
         }
 
@@ -124,23 +126,24 @@ def build_server(persist_dir: Path | None = None) -> Any:
 
         Returns:
             Dict with ``directory``, ``pattern``, ``documents_before``,
-            ``documents_after``, ``documents_indexed_delta``.
+            ``documents_after``, ``documents_indexed_delta`` (all in unique
+            source-file counts, not raw chunk counts).
         """
         directory_path = Path(directory).resolve()
         if not directory_path.is_dir():
             raise ValueError(f"Not a directory: {directory_path}")
 
         indexer = _get_indexer(persist_dir)
-        before = indexer.collection.count() if indexer.collection else 0
+        before = indexer.get_status()["document_count"]  # unique source files
         indexer.index_directory(directory_path, glob_pattern=pattern)
-        after = indexer.collection.count() if indexer.collection else 0
+        after = indexer.get_status()["document_count"]  # unique source files
 
         return {
             "directory": str(directory_path),
             "pattern": pattern,
-            "documents_before": int(before),
-            "documents_after": int(after),
-            "documents_indexed_delta": int(after - before),
+            "documents_before": before,
+            "documents_after": after,
+            "documents_indexed_delta": after - before,
         }
 
     return server

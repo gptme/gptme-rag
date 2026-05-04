@@ -31,7 +31,7 @@ def test_format_results_truncates_long_content():
     out = _format_results([fake_doc], [0.42], max_chars_per_doc=100)
 
     assert len(out) == 1
-    assert out[0]["score"] == pytest.approx(0.42)
+    assert out[0]["score"] == pytest.approx(1.0 - 0.42)  # distance → similarity
     assert out[0]["source"] == "/tmp/foo.md"
     assert out[0]["content"].endswith("...[truncated]")
     assert len(out[0]["content"]) <= 100 + len("...[truncated]")
