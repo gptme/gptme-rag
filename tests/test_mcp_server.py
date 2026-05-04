@@ -204,12 +204,12 @@ def test_query_top_k_clamped(tmp_path):
         {"directory": str(docs), "pattern": "**/*.md"},
     )
 
-    # top_k=0 → clamped to 1, returns at most 1 hit
+    # top_k=0 → clamped to 1, returns exactly 1 hit (2 docs indexed, clamp is the binding constraint)
     result = _call_tool(server, "rag_query", {"query": "gptme", "top_k": 0})
     hits = (
         result["result"] if isinstance(result, dict) and "result" in result else result
     )
-    assert len(hits) <= 1
+    assert len(hits) == 1
 
     # top_k=999 → clamped to 50, but we only have 2 docs so just verify no error
     result = _call_tool(server, "rag_query", {"query": "gptme", "top_k": 999})
