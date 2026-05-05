@@ -51,6 +51,111 @@ def test_format_results_handles_missing_metadata():
     assert out[0]["metadata"] == {}
 
 
+def test_assemble_context_deduplicates_by_source():
+    """_assemble_context should keep only the best entry per source file."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    doc_a = SimpleNamespace(
+        content="Content from file A.", metadata={"source": "/tmp/a.md"}
+    )
+    doc_b = SimpleNamespace(
+        content="Content from file B.", metadata={"source": "/tmp/b.md"}
+    )
+    doc_a2 = SimpleNamespace(
+        content="Another chunk from file A.", metadata={"source": "/tmp/a.md"}
+    )
+
+    # a.md appears twice — only the first (higher-ranked) entry should survive
+    output = _assemble_context([doc_a, doc_b, doc_a2], [0.1, 0.3, 0.5], "test query")
+    assert "file A." in output
+    assert "file B." in output
+    assert "Another chunk" not in output  # deduped out
+
+
+def test_assemble_context_includes_header_and_counts():
+    """_assemble_context should include a query header and document count."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    doc = SimpleNamespace(content="Hello world.", metadata={"source": "/tmp/x.md"})
+    output = _assemble_context([doc], [0.2], "find hello")
+    assert 'Retrieved Context for: "find hello"' in output
+    assert "1 relevant document(s) found" in output
+    assert "[80% relevant]" in output  # 1.0 - 0.2 = 0.8
+    assert "Hello world." in output
+
+
+def test_assemble_context_clamps_relevance_percentage():
+    """_assemble_context should keep displayed relevance percentages sane."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    poor_match = SimpleNamespace(
+        content="Low relevance.", metadata={"source": "/tmp/low.md"}
+    )
+    impossible_match = SimpleNamespace(
+        content="High relevance.", metadata={"source": "/tmp/high.md"}
+    )
+
+    output = _assemble_context(
+        [poor_match, impossible_match],
+        [1.5, -0.5],
+        "test",
+    )
+    assert "[0% relevant] low.md" in output
+    assert "[100% relevant] high.md" in output
+
+
+def test_assemble_context_respects_max_chars():
+    """_assemble_context should truncate when max_context_chars is hit."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    # Two long docs — cap is tight enough to truncate after the first
+    doc1 = SimpleNamespace(content="A" * 2000, metadata={"source": "/tmp/first.md"})
+    doc2 = SimpleNamespace(content="B" * 2000, metadata={"source": "/tmp/second.md"})
+    output = _assemble_context([doc1, doc2], [0.1, 0.2], "test", max_context_chars=1000)
+    assert "first.md" in output
+    assert "second.md" not in output
+    assert "omitted" in output.lower()
+    assert "1 more document" in output
+
+
+def test_assemble_context_cap_uses_rendered_markdown_length():
+    """_assemble_context should measure the actual rendered Markdown output."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    doc1 = SimpleNamespace(content="A", metadata={"source": "/tmp/first.md"})
+    doc2 = SimpleNamespace(content="B" * 200, metadata={"source": "/tmp/second.md"})
+    first_only = _assemble_context([doc1], [0.1], "test")
+    omission = "*(1 more document(s) omitted — context limit reached)*\n"
+    cap = len(first_only) + len(omission) + 5
+
+    output = _assemble_context([doc1, doc2], [0.1, 0.2], "test", max_context_chars=cap)
+    assert "first.md" in output
+    assert "second.md" not in output
+    assert len(output) <= cap
+
+
+def test_assemble_context_handles_missing_source():
+    """_assemble_context should not crash on docs without metadata."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    doc = SimpleNamespace(content="No metadata here.", metadata=None)
+    output = _assemble_context([doc], [0.5], "test")
+    assert "No metadata here." in output
+    assert "(unknown)" in output
+
+
 def test_cli_mcp_command_registered():
     """The `gptme-rag mcp` subcommand should be discoverable via Click."""
     from gptme_rag.cli import cli

@@ -7,8 +7,6 @@ existing gptme-rag index without going through the CLI.
 This is a v1 prototype — see ``gptme/gptme-rag#22`` for scope and roadmap.
 """
 
-from __future__ import annotations
-
 import logging
 from pathlib import Path
 from typing import Any
@@ -37,6 +35,73 @@ def _format_results(
             }
         )
     return out
+
+
+def _assemble_context(
+    documents: list,
+    scores: list[float],
+    query: str,
+    max_context_chars: int = 8000,
+) -> str:
+    """Assemble a coherent Markdown context block from search results.
+
+    Produces a formatted block suitable for direct injection into an agent's
+    system prompt or context window. Results are deduplicated by source,
+    ordered by relevance, and trimmed to fit within ``max_context_chars``.
+
+    Args:
+        documents: ChromaDB document list from ``Indexer.search``.
+        scores: Distance scores (lower = better).
+        query: The original query (for the header).
+        max_context_chars: Soft cap on total output characters (default 8000).
+
+    Returns:
+        Markdown-formatted context block.
+    """
+    max_chars_per_doc = 3000  # generous per-doc limit for context assembly
+    results = _format_results(documents, scores, max_chars_per_doc=max_chars_per_doc)
+
+    # Deduplicate by source (keep highest-scoring entry per source file)
+    seen_sources: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for entry in results:
+        source = entry["source"]
+        if source and source in seen_sources:
+            continue
+        if source:
+            seen_sources.add(source)
+        deduped.append(entry)
+
+    # Build sections
+    lines: list[str] = []
+    header = f'## Retrieved Context for: "{query}"'
+    lines.append(header)
+    lines.append("")
+    lines.append(f"*{len(deduped)} relevant document(s) found.*")
+    lines.append("")
+
+    for i, entry in enumerate(deduped):
+        source = entry["source"] or "(unknown)"
+        score_pct = max(0, min(100, round(entry["score"] * 100)))
+        filename = Path(source).name if source else "(unknown)"
+        section = (
+            f"### [{score_pct}% relevant] {filename}\n"
+            f"*Source: {source}*\n\n"
+            f"{entry['content']}\n\n"
+        )
+        # Always include at least the first result; truncate subsequent ones.
+        candidate = "\n".join([*lines, section]).rstrip() + "\n"
+        if i > 0 and len(candidate) > max_context_chars:
+            remaining = len(deduped) - i
+            if remaining > 0:
+                lines.append(
+                    f"*({remaining} more document(s) omitted — "
+                    f"context limit reached)*\n"
+                )
+            break
+        lines.append(section)
+
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def build_server(persist_dir: Path | None = None) -> Any:
@@ -90,6 +155,36 @@ def build_server(persist_dir: Path | None = None) -> Any:
         indexer = _get_indexer(persist_dir)
         documents, scores, _ = indexer.search(query=query, n_results=top_k)
         return _format_results(documents, scores)
+
+    @server.tool()
+    def rag_assemble_context(
+        query: str,
+        top_k: int = 5,
+        max_context_chars: int = 8000,
+        persist_dir: str | None = None,
+    ) -> str:
+        """Search the gptme-rag index and assemble results into a coherent
+        Markdown context block suitable for direct injection into an agent's
+        prompt or context window.
+
+        Use this instead of ``rag_query`` when you want a single ready-to-use
+        context block rather than raw structured results.
+
+        Args:
+            query: Natural-language search query.
+            top_k: Maximum number of results (default 5, capped at 50).
+            max_context_chars: Soft cap on output characters (default 8000).
+            persist_dir: Optional override for the index directory.
+
+        Returns:
+            Formatted Markdown block with deduplicated, relevance-ordered results.
+        """
+        top_k = max(1, min(int(top_k), 50))
+        indexer = _get_indexer(persist_dir)
+        documents, scores, _ = indexer.search(query=query, n_results=top_k)
+        return _assemble_context(
+            documents, scores, query, max_context_chars=max_context_chars
+        )
 
     @server.tool()
     def rag_index_status(persist_dir: str | None = None) -> dict[str, Any]:
