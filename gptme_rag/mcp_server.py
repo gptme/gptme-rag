@@ -7,8 +7,6 @@ existing gptme-rag index without going through the CLI.
 This is a v1 prototype — see ``gptme/gptme-rag#22`` for scope and roadmap.
 """
 
-from __future__ import annotations
-
 import logging
 from pathlib import Path
 from typing import Any
@@ -82,11 +80,9 @@ def _assemble_context(
     lines.append(f"*{len(deduped)} relevant document(s) found.*")
     lines.append("")
 
-    current_chars = len(header) + len(lines[1]) + len(lines[2]) + 1
-
     for i, entry in enumerate(deduped):
         source = entry["source"] or "(unknown)"
-        score_pct = round(entry["score"] * 100)
+        score_pct = max(0, min(100, round(entry["score"] * 100)))
         filename = Path(source).name if source else "(unknown)"
         section = (
             f"### [{score_pct}% relevant] {filename}\n"
@@ -94,7 +90,8 @@ def _assemble_context(
             f"{entry['content']}\n\n"
         )
         # Always include at least the first result; truncate subsequent ones.
-        if i > 0 and current_chars + len(section) > max_context_chars:
+        candidate = "\n".join([*lines, section]).rstrip() + "\n"
+        if i > 0 and len(candidate) > max_context_chars:
             remaining = len(deduped) - i
             if remaining > 0:
                 lines.append(
@@ -103,7 +100,6 @@ def _assemble_context(
                 )
             break
         lines.append(section)
-        current_chars += len(section)
 
     return "\n".join(lines).rstrip() + "\n"
 

@@ -88,6 +88,28 @@ def test_assemble_context_includes_header_and_counts():
     assert "Hello world." in output
 
 
+def test_assemble_context_clamps_relevance_percentage():
+    """_assemble_context should keep displayed relevance percentages sane."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    poor_match = SimpleNamespace(
+        content="Low relevance.", metadata={"source": "/tmp/low.md"}
+    )
+    impossible_match = SimpleNamespace(
+        content="High relevance.", metadata={"source": "/tmp/high.md"}
+    )
+
+    output = _assemble_context(
+        [poor_match, impossible_match],
+        [1.5, -0.5],
+        "test",
+    )
+    assert "[0% relevant] low.md" in output
+    assert "[100% relevant] high.md" in output
+
+
 def test_assemble_context_respects_max_chars():
     """_assemble_context should truncate when max_context_chars is hit."""
     from types import SimpleNamespace
@@ -102,6 +124,24 @@ def test_assemble_context_respects_max_chars():
     assert "second.md" not in output
     assert "omitted" in output.lower()
     assert "1 more document" in output
+
+
+def test_assemble_context_cap_uses_rendered_markdown_length():
+    """_assemble_context should measure the actual rendered Markdown output."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    doc1 = SimpleNamespace(content="A", metadata={"source": "/tmp/first.md"})
+    doc2 = SimpleNamespace(content="B" * 200, metadata={"source": "/tmp/second.md"})
+    first_only = _assemble_context([doc1], [0.1], "test")
+    omission = "*(1 more document(s) omitted — context limit reached)*\n"
+    cap = len(first_only) + len(omission) + 5
+
+    output = _assemble_context([doc1, doc2], [0.1, 0.2], "test", max_context_chars=cap)
+    assert "first.md" in output
+    assert "second.md" not in output
+    assert len(output) <= cap
 
 
 def test_assemble_context_handles_missing_source():
