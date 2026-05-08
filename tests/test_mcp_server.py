@@ -156,6 +156,79 @@ def test_assemble_context_handles_missing_source():
     assert "(unknown)" in output
 
 
+def test_rag_assemble_context_tool_with_fake_mcp(monkeypatch, tmp_path):
+    """rag_assemble_context should search the indexer and return Markdown."""
+    import sys
+    from types import ModuleType, SimpleNamespace
+
+    class FakeFastMCP:
+        def __init__(self, name):
+            self.name = name
+            self.tools = {}
+
+        def tool(self):
+            def decorator(func):
+                self.tools[func.__name__] = func
+                return func
+
+            return decorator
+
+    class FakeIndexer:
+        last_instance = None
+
+        def __init__(self, persist_directory, enable_persist):
+            self.persist_directory = persist_directory
+            self.enable_persist = enable_persist
+            self.search_calls = []
+            self.cache = {}
+            FakeIndexer.last_instance = self
+
+        def search(self, query, n_results):
+            self.search_calls.append((query, n_results))
+            return (
+                [
+                    SimpleNamespace(
+                        content="Prompt-ready context.",
+                        metadata={"source": "/tmp/context.md"},
+                    )
+                ],
+                [0.25],
+                None,
+            )
+
+        def get_status(self):
+            return {"document_count": 0, "chunk_count": 0}
+
+    mcp_module = ModuleType("mcp")
+    server_module = ModuleType("mcp.server")
+    fastmcp_module = ModuleType("mcp.server.fastmcp")
+    fastmcp_module.__dict__["FastMCP"] = FakeFastMCP
+    server_module.__dict__["fastmcp"] = fastmcp_module
+    mcp_module.__dict__["server"] = server_module
+    monkeypatch.setitem(sys.modules, "mcp", mcp_module)
+    monkeypatch.setitem(sys.modules, "mcp.server", server_module)
+    monkeypatch.setitem(sys.modules, "mcp.server.fastmcp", fastmcp_module)
+
+    indexer_module = ModuleType("gptme_rag.indexing.indexer")
+    indexer_module.__dict__["Indexer"] = FakeIndexer
+    monkeypatch.setitem(sys.modules, "gptme_rag.indexing.indexer", indexer_module)
+
+    from gptme_rag.mcp_server import build_server
+
+    server = build_server(persist_dir=tmp_path / "idx")
+    output = server.tools["rag_assemble_context"](
+        "agent context",
+        top_k=0,
+        max_context_chars=500,
+    )
+
+    assert FakeIndexer.last_instance is not None
+    assert FakeIndexer.last_instance.search_calls == [("agent context", 1)]
+    assert 'Retrieved Context for: "agent context"' in output
+    assert "[75% relevant] context.md" in output
+    assert "Prompt-ready context." in output
+
+
 def test_cli_mcp_command_registered():
     """The `gptme-rag mcp` subcommand should be discoverable via Click."""
     from gptme_rag.cli import cli
