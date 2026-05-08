@@ -104,6 +104,23 @@ def _assemble_context(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _assemble_context_from_indexer(
+    indexer: Any,
+    query: str,
+    top_k: int = 5,
+    max_context_chars: int = 8000,
+) -> str:
+    """Search an indexer and assemble the results into prompt-ready Markdown."""
+    top_k = max(1, min(int(top_k), 50))
+    documents, scores, _ = indexer.search(query=query, n_results=top_k)
+    return _assemble_context(
+        documents,
+        scores,
+        query,
+        max_context_chars=max_context_chars,
+    )
+
+
 def build_server(persist_dir: Path | None = None) -> Any:
     """Build the MCP server instance.
 
@@ -179,11 +196,11 @@ def build_server(persist_dir: Path | None = None) -> Any:
         Returns:
             Formatted Markdown block with deduplicated, relevance-ordered results.
         """
-        top_k = max(1, min(int(top_k), 50))
-        indexer = _get_indexer(persist_dir)
-        documents, scores, _ = indexer.search(query=query, n_results=top_k)
-        return _assemble_context(
-            documents, scores, query, max_context_chars=max_context_chars
+        return _assemble_context_from_indexer(
+            _get_indexer(persist_dir),
+            query,
+            top_k=top_k,
+            max_context_chars=max_context_chars,
         )
 
     @server.tool()
