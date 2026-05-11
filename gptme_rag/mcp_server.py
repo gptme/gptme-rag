@@ -26,7 +26,7 @@ def _format_byte_range(metadata: dict[str, Any]) -> str:
     end = metadata.get("byte_end")
     if not isinstance(start, int) or not isinstance(end, int):
         return ""
-    if end < start:
+    if end <= start:
         return ""
     return f" (bytes {start}-{end})"
 
