@@ -48,13 +48,10 @@ class DocumentProcessor:
             the byte offset of token ``tokens[i]`` in ``text.encode('utf-8')``.
         """
         offsets: list[int] = []
-        # Build cumulative byte-length lookups for decoded prefixes
-        decoded = ""
         byte_pos = 0
         for token in tokens:
             offsets.append(byte_pos)
-            decoded += self.encoding.decode([token])
-            byte_pos = len(decoded.encode("utf-8"))
+            byte_pos += len(self.encoding.decode([token]).encode("utf-8"))
         return offsets
 
     def process_text(
