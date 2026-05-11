@@ -32,27 +32,62 @@ class DocumentProcessor:
         self.max_chunks = max_chunks
         self.encoding = tiktoken.get_encoding(encoding_name)
 
+    def _token_byte_offsets(self, text: str, tokens: list[int]) -> list[int]:
+        """Compute starting byte offset in ``text`` for each token.
+
+        Works by decoding progressively longer token prefixes and measuring
+        the encoded length, so it handles multi-byte UTF-8 characters and
+        BPE edge cases correctly.
+
+        Args:
+            text: The original full text.
+            tokens: The tokenized representation of ``text``.
+
+        Returns:
+            A list of byte offsets, one per token, where position ``i`` is
+            the byte offset of token ``tokens[i]`` in ``text.encode('utf-8')``.
+        """
+        offsets: list[int] = []
+        # Build cumulative byte-length lookups for decoded prefixes
+        decoded = ""
+        byte_pos = 0
+        for token in tokens:
+            offsets.append(byte_pos)
+            decoded += self.encoding.decode([token])
+            byte_pos = len(decoded.encode("utf-8"))
+        return offsets
+
     def process_text(
         self,
         text: str,
         metadata: dict | None = None,
+        original_text: str | None = None,
     ) -> Generator[dict, None, None]:
         """Process text into chunks with metadata.
 
         Args:
             text: Text to process
             metadata: Optional metadata to include with each chunk
+            original_text: Original full text for computing byte offsets
+                (defaults to ``text`` when not provided).
 
         Yields:
-            Dict containing chunk text and metadata
+            Dict containing chunk text, metadata, and ``byte_start``/``byte_end``
+            offsets in the source text (UTF-8 byte positions, 0-indexed).
         """
         # Skip empty text
         if not text.strip():
             return
 
+        source = original_text or text
+        source_bytes = len(source.encode("utf-8"))
+
         try:
             # Encode text to tokens
             tokens = self.encoding.encode(text)
+
+            # Pre-compute token-level byte offsets in the source text
+            token_offsets = self._token_byte_offsets(source, tokens)
 
             # Calculate total chunks
             total_chunks = max(1, self.estimate_chunks(len(tokens)))
@@ -60,7 +95,7 @@ class DocumentProcessor:
             # If text is short enough, yield as single chunk
             if len(tokens) <= self.chunk_size:
                 yield {
-                    "text": text,
+                    "text": source,
                     "metadata": {
                         **(metadata or {}),
                         "chunk_index": 0,
@@ -68,6 +103,8 @@ class DocumentProcessor:
                         "total_chunks": 1,
                         "chunk_start": 0,
                         "chunk_end": len(tokens),
+                        "byte_start": 0,
+                        "byte_end": source_bytes,
                     },
                 }
                 return
@@ -84,10 +121,18 @@ class DocumentProcessor:
                 chunk_tokens = tokens[chunk_start:chunk_end]
                 chunk_text = self.encoding.decode(chunk_tokens)
 
+                # Compute byte range from pre-computed token offsets
+                chunk_byte_start = token_offsets[chunk_start]
+                if chunk_end < len(tokens):
+                    chunk_byte_end = token_offsets[chunk_end]
+                else:
+                    chunk_byte_end = source_bytes
+
                 # Log chunk info
                 logger.debug(
                     f"Creating chunk {chunk_count} with {len(chunk_tokens)} tokens, "
-                    f"{len(chunk_text)} chars, {chunk_text[:50]}..."
+                    f"{len(chunk_text)} chars (bytes {chunk_byte_start}-{chunk_byte_end}), "
+                    f"{chunk_text[:50]}..."
                 )
 
                 # Create chunk metadata
@@ -101,6 +146,8 @@ class DocumentProcessor:
                         "chunk_start": chunk_start,
                         "chunk_end": chunk_end,
                         "is_chunk": True,
+                        "byte_start": chunk_byte_start,
+                        "byte_end": chunk_byte_end,
                     },
                 }
 
@@ -122,7 +169,7 @@ class DocumentProcessor:
             logger.error(f"Error processing text: {e}")
             # Yield the entire text as a single chunk if processing fails
             yield {
-                "text": text,
+                "text": source,
                 "metadata": {
                     **(metadata or {}),
                     "chunk_index": 0,
@@ -131,6 +178,8 @@ class DocumentProcessor:
                     "chunk_start": 0,
                     "chunk_end": len(text),
                     "error": str(e),
+                    "byte_start": 0,
+                    "byte_end": source_bytes,
                 },
             }
 
@@ -192,6 +241,9 @@ class DocumentProcessor:
             # Skip empty files
             if not content.strip():
                 return
+
+            # Record source byte size for provenance tracking
+            file_metadata["source_bytes"] = len(content.encode("utf-8"))
 
             # Process the content
             yield from self.process_text(content, file_metadata)

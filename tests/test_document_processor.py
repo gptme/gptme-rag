@@ -150,3 +150,79 @@ def test_small_text():
 
     assert len(chunks) == 1
     assert chunks[0]["text"] == text
+
+
+def test_source_byte_size(tmp_path):
+    """Test that source_bytes metadata is available on processed files."""
+    file_path = tmp_path / "test.txt"
+    content = "This is a test.\n" * 200
+    file_path.write_text(content)
+
+    processor = DocumentProcessor(chunk_size=100, chunk_overlap=20)
+    chunks = list(processor.process_file(file_path))
+
+    assert len(chunks) > 0
+    expected_size = len(content.encode("utf-8"))
+    for chunk in chunks:
+        assert "source_bytes" in chunk["metadata"]
+        assert chunk["metadata"]["source_bytes"] > 0
+        source_bytes = chunk["metadata"]["source_bytes"]
+        assert source_bytes == expected_size
+
+
+def test_byte_offsets_in_chunks():
+    """Test that byte_start and byte_end track positions in the source text."""
+    processor = DocumentProcessor(chunk_size=100, chunk_overlap=0)
+    # Use repetitive text for predictable chunking
+    text = "Hello world! " * 200
+
+    chunks = list(processor.process_text(text))
+    assert (
+        len(chunks) > 1
+    ), f"Expected multiple chunks for 200 repetitions, got {len(chunks)}"
+
+    # Verify byte offsets are monotonically increasing and non-overlapping
+    for i, chunk in enumerate(chunks):
+        assert "byte_start" in chunk["metadata"]
+        assert "byte_end" in chunk["metadata"]
+        start = chunk["metadata"]["byte_start"]
+        end = chunk["metadata"]["byte_end"]
+        assert start < end, f"Chunk {i}: byte_start ({start}) >= byte_end ({end})"
+
+    # First chunk starts at 0, last chunk ends at total byte size
+    assert chunks[0]["metadata"]["byte_start"] == 0
+    total_bytes = len(text.encode("utf-8"))
+    assert chunks[-1]["metadata"]["byte_end"] == total_bytes
+
+    # Consecutive chunks: previous end equals next start (with overlap=0)
+    for i in range(len(chunks) - 1):
+        prev_end = chunks[i]["metadata"]["byte_end"]
+        next_start = chunks[i + 1]["metadata"]["byte_start"]
+        assert (
+            prev_end == next_start
+        ), f"Chunk {i} byte_end ({prev_end}) != Chunk {i+1} byte_start ({next_start})"
+
+
+def test_byte_offsets_single_chunk():
+    """Test that a single-chunk document gets correct byte offsets."""
+    processor = DocumentProcessor(chunk_size=1000, chunk_overlap=20)
+    text = "A short text."
+    chunks = list(processor.process_text(text))
+
+    assert len(chunks) == 1
+    assert chunks[0]["metadata"]["byte_start"] == 0
+    assert chunks[0]["metadata"]["byte_end"] == len(text.encode("utf-8"))
+
+
+def test_byte_offsets_utf8_multibyte():
+    """Test byte offsets work correctly with multi-byte UTF-8 characters."""
+    processor = DocumentProcessor(chunk_size=50, chunk_overlap=0)
+    # Use characters that take multiple bytes in UTF-8
+    text = "日本語テスト" * 30  # 5 chars × 30, each char 3 bytes = 450 bytes total
+    source_bytes = len(text.encode("utf-8"))
+
+    chunks = list(processor.process_text(text))
+    assert len(chunks) > 1
+
+    assert chunks[0]["metadata"]["byte_start"] == 0
+    assert chunks[-1]["metadata"]["byte_end"] == source_bytes

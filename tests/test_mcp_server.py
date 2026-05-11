@@ -144,6 +144,54 @@ def test_assemble_context_cap_uses_rendered_markdown_length():
     assert len(output) <= cap
 
 
+def test_format_byte_range_returns_suffix_when_present():
+    """_format_byte_range should produce a ' (bytes N-M)' suffix when both offsets are integers."""
+    from gptme_rag.mcp_server import _format_byte_range
+
+    assert (
+        _format_byte_range({"byte_start": 100, "byte_end": 350}) == " (bytes 100-350)"
+    )
+
+
+def test_format_byte_range_skips_when_missing_or_invalid():
+    """_format_byte_range should return '' for missing, partial, or malformed byte ranges."""
+    from gptme_rag.mcp_server import _format_byte_range
+
+    assert _format_byte_range({}) == ""
+    assert _format_byte_range({"byte_start": 0}) == ""
+    assert _format_byte_range({"byte_end": 10}) == ""
+    assert _format_byte_range({"byte_start": "10", "byte_end": "20"}) == ""
+    # nonsense ordering should not produce a suffix
+    assert _format_byte_range({"byte_start": 200, "byte_end": 100}) == ""
+
+
+def test_assemble_context_includes_byte_range_when_present():
+    """_assemble_context should surface byte_start/byte_end in the citation header."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    doc = SimpleNamespace(
+        content="Chunk body text.",
+        metadata={"source": "/tmp/notes.md", "byte_start": 1024, "byte_end": 2048},
+    )
+    output = _assemble_context([doc], [0.1], "find notes")
+    assert "/tmp/notes.md (bytes 1024-2048)" in output
+
+
+def test_assemble_context_omits_byte_range_when_absent():
+    """_assemble_context should not invent a byte range when metadata lacks offsets."""
+    from types import SimpleNamespace
+
+    from gptme_rag.mcp_server import _assemble_context
+
+    doc = SimpleNamespace(
+        content="No range metadata.", metadata={"source": "/tmp/plain.md"}
+    )
+    output = _assemble_context([doc], [0.1], "test")
+    assert "(bytes " not in output
+
+
 def test_assemble_context_handles_missing_source():
     """_assemble_context should not crash on docs without metadata."""
     from types import SimpleNamespace
