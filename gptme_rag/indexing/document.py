@@ -27,6 +27,8 @@ class Document:
     embedding: list[float] | None = None
     last_modified: datetime | None = None
     chunk_index: int | None = None
+    byte_start: int | None = None
+    byte_end: int | None = None
 
     @classmethod
     def from_file(
@@ -79,6 +81,8 @@ class Document:
                     doc_id=chunk_id,
                     last_modified=last_modified,
                     chunk_index=chunk["metadata"]["chunk_index"],
+                    byte_start=chunk["metadata"].get("byte_start"),
+                    byte_end=chunk["metadata"].get("byte_end"),
                 )
 
     @property
@@ -90,18 +94,20 @@ class Document:
         """
         return self.chunk_index is not None or self.metadata.get("is_chunk", False)
 
-    def get_chunk_info(self) -> tuple[int, int]:
+    def get_chunk_info(self) -> tuple[int, int, int | None, int | None]:
         """Get information about the chunk.
 
         Returns:
-            Tuple of (chunk_index, total_chunks) if this is a chunk,
-            otherwise (0, 1)
+            Tuple of (chunk_index, total_chunks, byte_start, byte_end) if this
+            is a chunk, otherwise (0, 1, None, None).
         """
         if not self.is_chunk or self.chunk_index is None:
-            return (0, 1)
+            return (0, 1, None, None)
         chunk_index = self.chunk_index  # Now we know it's not None
         total_chunks = self.metadata.get("total_chunks", chunk_index + 1)
-        return (chunk_index, total_chunks)
+        byte_start = self.byte_start
+        byte_end = self.byte_end
+        return (chunk_index, total_chunks, byte_start, byte_end)
 
     def format_xml(self) -> str:
         """Format the document as an XML object."""

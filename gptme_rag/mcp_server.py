@@ -14,6 +14,23 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _format_byte_range(metadata: dict[str, Any]) -> str:
+    """Format a ' (bytes N-M)' suffix from chunk metadata, or '' if absent.
+
+    Surfaces the chunk's byte range so agents (and humans) can locate the exact
+    region of the source file the chunk came from without re-running retrieval.
+    """
+    if not metadata:
+        return ""
+    start = metadata.get("byte_start")
+    end = metadata.get("byte_end")
+    if not isinstance(start, int) or not isinstance(end, int):
+        return ""
+    if end < start:
+        return ""
+    return f" (bytes {start}-{end})"
+
+
 def _format_results(
     documents: list,
     scores: list[float],
@@ -84,9 +101,11 @@ def _assemble_context(
         source = entry["source"] or "(unknown)"
         score_pct = max(0, min(100, round(entry["score"] * 100)))
         filename = Path(source).name if source else "(unknown)"
+        byte_range = _format_byte_range(entry.get("metadata") or {})
+        source_line = f"*Source: {source}{byte_range}*"
         section = (
             f"### [{score_pct}% relevant] {filename}\n"
-            f"*Source: {source}*\n\n"
+            f"{source_line}\n\n"
             f"{entry['content']}\n\n"
         )
         # Always include at least the first result; truncate subsequent ones.
