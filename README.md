@@ -1,5 +1,9 @@
 # gptme-rag
 
+> **This repository has been upstreamed into [gptme-contrib](https://github.com/gptme/gptme-contrib).**
+> Please use the package from there: [`packages/gptme-rag`](https://github.com/gptme/gptme-contrib/tree/master/packages/gptme-rag).
+> This repo will be archived and will no longer receive updates.
+
 A powerful RAG (Retrieval-Augmented Generation) system that enhances AI interactions by providing relevant context from your local files. Built primarily for [gptme](https://github.com/ErikBjare/gptme), but can be used standalone.
 
 RAG systems improve AI responses by retrieving and incorporating relevant information from a knowledge base into the generation process. This leads to more accurate, contextual, and factual responses.
